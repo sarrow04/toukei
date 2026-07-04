@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>統計辞典 — 基礎から機械学習まで</title>
+<style>
+  :root{
+    --paper:#F6F4EE; --panel:#FFFFFF; --grid:#D9D5C8;
+    --ink:#22261D; --ink-soft:#5B5F52;
+    --accent:#2B4570; --accent-soft:#EDF1F7;
+    --mustard:#C1873A; --mustard-soft:#FBF0DE;
+    --result:#3C7A5D; --result-soft:#EAF3EE;
+    --py:#2F6B4F; --py-soft:#EAF2ED;
+    --serif:"Yu Mincho","YuMincho","Hiragino Mincho ProN","Noto Serif JP",serif;
+    --sans:"Hiragino Sans","Yu Gothic","Noto Sans JP",sans-serif;
+    --mono:"SF Mono","Consolas","Menlo",monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:var(--sans);}
+  body{min-height:100vh;}
+
+  .topbar{position:sticky; top:0; z-index:20; background:var(--panel); border-bottom:1px solid var(--grid);
+    padding:10px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;}
+  .brand{font-family:var(--serif); font-size:20px; font-weight:700; color:var(--accent); white-space:nowrap;}
+  .brand small{display:block; font-family:var(--sans); font-size:10px; font-weight:400; color:var(--ink-soft); letter-spacing:.06em;}
+  .fx-bar{flex:1; min-width:180px; display:flex; align-items:center; gap:8px; background:var(--paper);
+    border:1px solid var(--grid); border-radius:4px; padding:6px 10px;}
+  .fx-label{font-family:var(--mono); font-style:italic; color:var(--accent); font-size:13px; font-weight:700;}
+  #search{flex:1; border:none; background:transparent; outline:none; font-family:var(--mono); font-size:14px; color:var(--ink);}
+  #search::placeholder{color:#9a9a8c;}
+  .count-pill{font-family:var(--mono); font-size:11px; color:var(--ink-soft); background:var(--panel);
+    border:1px solid var(--grid); border-radius:12px; padding:3px 10px; white-space:nowrap;}
+  .sync-pill{font-family:var(--mono); font-size:11px; border-radius:12px; padding:3px 10px; white-space:nowrap; cursor:pointer;}
+  .sync-pill.ok{background:var(--result-soft); color:var(--result); border:1px solid #bcdccb;}
+  .sync-pill.local{background:var(--mustard-soft); color:var(--mustard); border:1px solid #ecd3a6;}
+
+  .layout{display:flex; max-width:1400px; margin:0 auto;}
+  .tabs{width:190px; flex-shrink:0; border-right:1px solid var(--grid); padding:14px 0;
+    position:sticky; top:53px; align-self:flex-start; height:calc(100vh - 53px); overflow-y:auto;}
+  .tab{display:flex; align-items:baseline; gap:8px; padding:10px 16px; cursor:pointer;
+    border-left:3px solid transparent; font-size:13px; color:var(--ink-soft);}
+  .tab .tab-letter{font-family:var(--mono); font-weight:700; color:var(--mustard); font-size:12px;}
+  .tab:hover{background:var(--accent-soft);}
+  .tab.active{border-left-color:var(--accent); background:var(--accent-soft); color:var(--ink); font-weight:700;}
+  .tab.active .tab-letter{color:var(--accent);}
+  .sheet-note{margin:14px 16px 0; padding:10px; font-size:11px; color:var(--ink-soft); border-top:1px dashed var(--grid); line-height:1.6;}
+  .sheet-note button{margin-top:6px; width:100%; padding:6px; font-size:11px; font-family:var(--sans);
+    background:var(--panel); border:1px solid var(--grid); border-radius:4px; cursor:pointer; color:var(--accent);}
+
+  .main{flex:1; min-width:0; display:flex;}
+  .list-pane{width:300px; flex-shrink:0; border-right:1px solid var(--grid); height:calc(100vh - 53px); overflow-y:auto;}
+  .row-item{display:flex; align-items:center; gap:10px; padding:9px 14px; cursor:pointer; border-bottom:1px solid var(--grid); font-size:13px;}
+  .row-item:nth-child(even){background:#FBFAF7;}
+  .row-item:hover{background:var(--accent-soft);}
+  .row-item.active{background:var(--accent); color:#fff;}
+  .row-item.active .ref-badge{background:#fff; color:var(--accent);}
+  .row-item.active .kana{color:#dde5f0;}
+  .ref-badge{font-family:var(--mono); font-size:10px; font-weight:700; background:var(--mustard-soft); color:var(--mustard);
+    border-radius:3px; padding:2px 6px; flex-shrink:0;}
+  .row-item .name{font-weight:600;}
+  .row-item .kana{font-size:10px; color:var(--ink-soft); display:block;}
+
+  .detail-pane{flex:1; min-width:0; padding:28px 36px; height:calc(100vh - 53px); overflow-y:auto;}
+  .empty-state{color:var(--ink-soft); font-size:14px; padding-top:40px; text-align:center;}
+
+  .entry-head{display:flex; align-items:flex-start; gap:14px; margin-bottom:6px;}
+  .ref-badge-lg{font-family:var(--mono); font-weight:700; font-size:13px; background:var(--mustard-soft); color:var(--mustard);
+    border-radius:4px; padding:5px 10px; margin-top:4px;}
+  .entry-title{font-family:var(--serif); font-size:26px; font-weight:700; color:var(--accent); line-height:1.3;}
+  .entry-kana{font-size:12px; color:var(--ink-soft); margin-top:2px;}
+  .level-tag{display:inline-block; font-size:10px; padding:2px 8px; border-radius:10px; margin-left:8px;
+    background:var(--result-soft); color:var(--result); vertical-align:middle; font-weight:700;}
+
+  .section-label{font-family:var(--mono); font-size:11px; letter-spacing:.06em; color:var(--ink-soft);
+    text-transform:uppercase; margin:22px 0 8px; border-bottom:1px solid var(--grid); padding-bottom:4px;}
+  .points{margin:0; padding-left:18px; font-size:14px; line-height:1.85;}
+  .points li{margin-bottom:2px;}
+  .usecase-text{font-size:13.5px; line-height:1.8; color:var(--ink-soft);}
+
+  .py-box{background:var(--py-soft); border:1px solid #c3ddcd; border-radius:6px; padding:12px 14px;}
+  .py-box pre{margin:0; font-family:var(--mono); font-size:12.5px; color:var(--py); white-space:pre-wrap; word-break:break-word;}
+
+  .practice-box{background:var(--accent-soft); border:1px solid #c9d5e8; border-radius:6px; padding:14px 16px;}
+  .practice-box .p-formula{font-family:var(--mono); font-size:12px; color:var(--accent); background:#fff;
+    border:1px solid #c9d5e8; border-radius:4px; padding:7px 10px; margin-bottom:10px;}
+  .practice-box .p-result{font-size:13.5px; line-height:1.8;}
+  .practice-box .p-result b{color:var(--accent); font-family:var(--mono);}
+
+  .related-tags{display:flex; flex-wrap:wrap; gap:6px;}
+  .rel-tag{font-family:var(--mono); font-size:11px; background:var(--panel); border:1px solid var(--grid);
+    border-radius:12px; padding:3px 10px; cursor:pointer; color:var(--ink-soft);}
+  .rel-tag:hover{border-color:var(--accent); color:var(--accent);}
+
+  .sheet-wrap{max-width:1400px; margin:0 auto; padding:14px 16px 30px; border-top:1px solid var(--grid);}
+  .sheet-wrap h2{font-family:var(--serif); font-size:15px; color:var(--accent); margin:14px 0 8px;}
+  .sheet-wrap p{font-size:12.5px; color:var(--ink-soft); margin:0 0 10px; line-height:1.7;}
+  table.gridsheet{border-collapse:collapse; font-family:var(--mono); font-size:12px; width:100%; background:#fff;}
+  table.gridsheet th, table.gridsheet td{border:1px solid var(--grid); padding:5px 8px; text-align:center;}
+  table.gridsheet thead th{background:var(--accent); color:#fff; font-weight:700;}
+  table.gridsheet td.rownum, table.gridsheet th.rownum{background:#EFEDE4; color:var(--ink-soft); font-weight:700; width:28px;}
+  table.gridsheet tbody tr:nth-child(even){background:#FBFAF7;}
+
+  /* ---- 用語追加フォーム（GAS連携） ---- */
+  .add-wrap{max-width:1400px; margin:0 auto; padding:20px 16px 40px; border-top:1px solid var(--grid);}
+  .add-wrap h2{font-family:var(--serif); font-size:15px; color:var(--accent); margin:14px 0 10px;}
+  .add-wrap p{font-size:12px; color:var(--ink-soft); line-height:1.7; margin:0 0 10px;}
+  .config-row{display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;}
+  .config-row input{flex:1; min-width:240px; font-family:var(--mono); font-size:12px; padding:7px 9px;
+    border:1px solid var(--grid); border-radius:4px;}
+  .config-row button{font-family:var(--sans); font-size:12px; padding:7px 14px; border-radius:4px; border:1px solid var(--accent);
+    background:var(--accent); color:#fff; cursor:pointer;}
+  .add-form{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .add-form label{font-size:11px; color:var(--ink-soft); display:block; margin-bottom:3px;}
+  .add-form input, .add-form textarea, .add-form select{width:100%; font-family:var(--sans); font-size:13px; padding:7px 9px;
+    border:1px solid var(--grid); border-radius:4px; background:#fff;}
+  .add-form textarea{font-family:var(--mono); font-size:12px; min-height:60px; resize:vertical;}
+  .add-form .full{grid-column:1/-1;}
+  .add-form .submit-row{grid-column:1/-1; display:flex; align-items:center; gap:10px;}
+  .add-form button{font-size:13px; padding:9px 18px; border-radius:4px; border:1px solid var(--result); background:var(--result); color:#fff; cursor:pointer;}
+  #addStatus{font-size:12px; color:var(--ink-soft);}
+
+  @media (max-width:900px){
+    .tabs{display:none;} .list-pane{width:150px;} .detail-pane{padding:20px 16px;} .brand small{display:none;}
+    .add-form{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">統計辞典<small>基礎統計 → 検定 → 回帰 → 機械学習</small></div>
+  <div class="fx-bar">
+    <span class="fx-label">fx</span>
+    <input id="search" type="text" placeholder="用語・かな・要点で検索（例: 相関、t検定、過学習）">
+  </div>
+  <div class="sync-pill local" id="syncPill">スプレッドシート未接続</div>
+  <div class="count-pill" id="countPill">45件</div>
+</div>
+
+<div class="layout">
+  <div class="tabs" id="tabs"></div>
+  <div class="main">
+    <div class="list-pane" id="listPane"></div>
+    <div class="detail-pane" id="detailPane">
+      <div class="empty-state">左のリストから用語を選ぶか、検索してください。</div>
+    </div>
+  </div>
+</div>
+
+<div class="sheet-wrap">
+  <h2>■ サンプルシート（実践例の計算元データ）</h2>
+  <p>12名分の架空の人事データ。一部の用語の「実践例」はこの表から実際に計算しています。用語データ自体（定義・Pythonコードなど）はこれとは別に、下記のGoogle Sheetsで管理します。</p>
+  <div id="sheetTable"></div>
+</div>
+
+<div class="add-wrap">
+  <h2>■ Google Sheets 連携（GAS）</h2>
+  <p>この辞典の用語データはGoogle Sheets側で保存・編集する想定です。下にデプロイ済みのGAS ウェブアプリURLを貼ると、シートの内容を読み込みます（貼らない場合は本体に同梱のサンプルデータで動作します）。セットアップ方法は別途お渡しするGASコードと手順を参照してください。</p>
+  <div class="config-row">
+    <input id="gasUrl" type="text" placeholder="https://script.google.com/macros/s/xxxx/exec">
+    <button id="connectBtn">接続して読み込む</button>
+  </div>
+  <p id="addStatus" style="margin-bottom:14px;"></p>
+
+  <h2>＋ 新しい用語を追加</h2>
+  <p>接続済みの場合、ここで入力した内容はシートに新しい行として追加されます（doPost）。</p>
+  <div class="add-form">
+    <div><label>参照ID（例: A11）</label><input id="f_ref"></div>
+    <div><label>カテゴリ</label>
+      <select id="f_cat"><option value="A">A 基礎統計</option><option value="B">B 確率分布</option>
+      <option value="C">C 推測統計・検定</option><option value="D">D 回帰・多変量解析</option>
+      <option value="E">E 教師あり学習</option><option value="F">F 教師なし学習</option></select></div>
+    <div><label>用語名</label><input id="f_name"></div>
+    <div><label>読み方</label><input id="f_kana"></div>
+    <div class="full"><label>要点（改行区切りで2〜3個）</label><textarea id="f_points"></textarea></div>
+    <div class="full"><label>利用例（1行）</label><input id="f_usecase"></div>
+    <div class="full"><label>Pythonコード</label><textarea id="f_python"></textarea></div>
+    <div><label>難易度</label>
+      <select id="f_level"><option>基礎</option><option>応用</option><option>実践</option></select></div>
+    <div><label>関連用語（カンマ区切りref）</label><input id="f_related"></div>
+    <div class="submit-row"><button id="addBtn">シートに追加</button><span id="addStatus2"></span></div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   0. GAS 連携設定
+   デプロイ済みGASウェブアプリのURLをここに直接書いておいてもよい。
+   （空のままなら下の入力欄からその場で接続できる）
+========================================================= */
+const CONFIG = { GAS_URL: "" };
+
+/* =========================================================
+   1. サンプルデータセット（実践例の計算専用・人事データ12行）
+========================================================= */
+const DATA = [
+  {id:1,  name:"佐藤", age:34, tenure:5,  ot:42, score:78, dept:"営業", leave:0},
+  {id:2,  name:"鈴木", age:28, tenure:2,  ot:55, score:65, dept:"営業", leave:1},
+  {id:3,  name:"高橋", age:45, tenure:12, ot:18, score:88, dept:"開発", leave:0},
+  {id:4,  name:"田中", age:31, tenure:4,  ot:60, score:60, dept:"営業", leave:1},
+  {id:5,  name:"伊藤", age:39, tenure:8,  ot:25, score:82, dept:"開発", leave:0},
+  {id:6,  name:"渡辺", age:26, tenure:1,  ot:48, score:70, dept:"人事", leave:0},
+  {id:7,  name:"山本", age:42, tenure:10, ot:15, score:90, dept:"開発", leave:0},
+  {id:8,  name:"中村", age:29, tenure:3,  ot:52, score:68, dept:"営業", leave:1},
+  {id:9,  name:"小林", age:36, tenure:6,  ot:30, score:80, dept:"人事", leave:0},
+  {id:10, name:"加藤", age:33, tenure:5,  ot:38, score:75, dept:"開発", leave:0},
+  {id:11, name:"吉田", age:27, tenure:2,  ot:58, score:62, dept:"営業", leave:1},
+  {id:12, name:"山田", age:40, tenure:9,  ot:20, score:85, dept:"開発", leave:0},
+];
+
+/* =========================================================
+   2. 汎用統計関数
+========================================================= */
+const sum = a => a.reduce((s,x)=>s+x,0);
+const mean = a => sum(a)/a.length;
+const variance = (a,sample=true) => { const m=mean(a); return sum(a.map(x=>(x-m)**2))/(a.length-(sample?1:0)); };
+const stdev = (a,sample=true) => Math.sqrt(variance(a,sample));
+const median = a => { const s=[...a].sort((x,y)=>x-y), n=s.length; return n%2 ? s[(n-1)/2] : (s[n/2-1]+s[n/2])/2; };
+const modeInfo = a => { const f={}; a.forEach(x=>f[x]=(f[x]||0)+1); const mx=Math.max(...Object.values(f));
+  return {modes:Object.keys(f).filter(k=>f[k]===mx).map(Number), max:mx}; };
+const quartile = (a,q) => { const s=[...a].sort((x,y)=>x-y), n=s.length, pos=(q/4)*(n-1), lo=Math.floor(pos), hi=Math.ceil(pos);
+  return lo===hi ? s[lo] : s[lo]+(pos-lo)*(s[hi]-s[lo]); };
+const covarP = (a,b) => { const ma=mean(a), mb=mean(b); return sum(a.map((x,i)=>(x-ma)*(b[i]-mb)))/a.length; };
+const correl = (a,b) => covarP(a,b)/(stdev(a,false)*stdev(b,false));
+const skewness = a => { const n=a.length, m=mean(a), s=stdev(a,true); return (n/((n-1)*(n-2)))*sum(a.map(x=>((x-m)/s)**3)); };
+const kurtosis = a => { const n=a.length, m=mean(a), s=stdev(a,true);
+  return (n*(n+1)/((n-1)*(n-2)*(n-3)))*sum(a.map(x=>((x-m)/s)**4)) - (3*(n-1)**2)/((n-2)*(n-3)); };
+const standardize = (x,m,s) => (x-m)/s;
+function erf(x){ const sign=x<0?-1:1; x=Math.abs(x);
+  const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
+  const t=1/(1+p*x); const y=1-(((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x); return sign*y; }
+const normCDF = (x,m,s) => 0.5*(1+erf((x-m)/(s*Math.sqrt(2))));
+function gammaln(x){ const g=7;
+  const c=[0.99999999999980993,676.5203681218851,-1259.1392167224028,771.32342877765313,-176.61502916214059,
+    12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+  if(x<0.5) return Math.log(Math.PI/Math.sin(Math.PI*x)) - gammaln(1-x);
+  x-=1; let a=c[0]; const t=x+g+0.5; for(let i=1;i<g+2;i++) a+=c[i]/(x+i);
+  return 0.5*Math.log(2*Math.PI)+(x+0.5)*Math.log(t)-t+Math.log(a); }
+function gammpSeries(a,x){ let s=1/a, del=s, ap=a;
+  for(let n=0;n<200;n++){ ap+=1; del*=x/ap; s+=del; if(Math.abs(del)<Math.abs(s)*1e-12) break; }
+  return s*Math.exp(-x+a*Math.log(x)-gammaln(a)); }
+function gammqCF(a,x){ let b=x+1-a, c=1e300, d=1/b, h=d;
+  for(let i=1;i<200;i++){ const an=-i*(i-a); b+=2; d=an*d+b; if(Math.abs(d)<1e-300) d=1e-300;
+    c=b+an/c; if(Math.abs(c)<1e-300) c=1e-300; d=1/d; const del=d*c; h*=del; if(Math.abs(del-1)<1e-12) break; }
+  return Math.exp(-x+a*Math.log(x)-gammaln(a))*h; }
+function gammq(a,x){ if(x<0||a<=0) return NaN; return x<a+1 ? 1-gammpSeries(a,x) : gammqCF(a,x); }
+function betacf(x,a,b){ const MAXIT=200, EPS=3e-12, FPMIN=1e-300; const qab=a+b, qap=a+1, qam=a-1;
+  let c=1, d=1-qab*x/qap; if(Math.abs(d)<FPMIN) d=FPMIN; d=1/d; let h=d;
+  for(let m=1;m<=MAXIT;m++){ const m2=2*m; let aa=m*(b-m)*x/((qam+m2)*(a+m2));
+    d=1+aa*d; if(Math.abs(d)<FPMIN) d=FPMIN; c=1+aa/c; if(Math.abs(c)<FPMIN) c=FPMIN; d=1/d; h*=d*c;
+    aa=-(a+m)*(qab+m)*x/((a+m2)*(qap+m2)); d=1+aa*d; if(Math.abs(d)<FPMIN) d=FPMIN;
+    c=1+aa/c; if(Math.abs(c)<FPMIN) c=FPMIN; d=1/d; const del=d*c; h*=del; if(Math.abs(del-1)<EPS) break; }
+  return h; }
+function betai(a,b,x){ if(x<=0) return 0; if(x>=1) return 1;
+  const bt=Math.exp(gammaln(a+b)-gammaln(a)-gammaln(b)+a*Math.log(x)+b*Math.log(1-x));
+  return x<(a+1)/(a+b+2) ? bt*betacf(x,a,b)/a : 1-bt*betacf(1-x,b,a)/b; }
+function welchTTest(a,b){ const ma=mean(a), mb=mean(b), va=variance(a,true), vb=variance(b,true), na=a.length, nb=b.length;
+  const se=Math.sqrt(va/na+vb/nb), t=(ma-mb)/se;
+  const df=(va/na+vb/nb)**2/((va/na)**2/(na-1)+(vb/nb)**2/(nb-1));
+  const p=betai(df/2,0.5,df/(df+t*t)); return {t,df,p,ma,mb}; }
+function chiSquareTest(table){ const rows=table.length, cols=table[0].length;
+  const rowTot=table.map(r=>sum(r)), colTot=Array.from({length:cols},(_,j)=>sum(table.map(r=>r[j]))), grand=sum(rowTot);
+  let chi2=0; const expected=table.map((r,i)=>r.map((v,j)=>rowTot[i]*colTot[j]/grand));
+  for(let i=0;i<rows;i++) for(let j=0;j<cols;j++){ const e=expected[i][j]; chi2 += e>0 ? (table[i][j]-e)**2/e : 0; }
+  const df=(rows-1)*(cols-1); return {chi2,df,p:gammq(df/2,chi2/2)}; }
+function linreg(x,y){ const slope=covarP(x,y)/variance(x,false); return {slope, intercept:mean(y)-slope*mean(x), r2:correl(x,y)**2}; }
+function multiRegress(predictors,y){ const n=y.length, k=predictors.length;
+  const X=Array.from({length:n},(_,i)=>[1,...predictors.map(p=>p[i])]); const p=k+1;
+  const XtX=Array.from({length:p},(_,i)=>Array.from({length:p},(_,j)=>sum(X.map(row=>row[i]*row[j]))));
+  const Xty=Array.from({length:p},(_,i)=>sum(X.map((row,idx)=>row[i]*y[idx])));
+  const A=XtX.map((row,i)=>[...row,Xty[i]]);
+  for(let i=0;i<p;i++){ let mr=i; for(let k2=i+1;k2<p;k2++) if(Math.abs(A[k2][i])>Math.abs(A[mr][i])) mr=k2;
+    [A[i],A[mr]]=[A[mr],A[i]];
+    for(let k2=i+1;k2<p;k2++){ const f=A[k2][i]/A[i][i]; for(let j=i;j<=p;j++) A[k2][j]-=f*A[i][j]; } }
+  const beta=Array(p).fill(0);
+  for(let i=p-1;i>=0;i--){ let s=A[i][p]; for(let j=i+1;j<p;j++) s-=A[i][j]*beta[j]; beta[i]=s/A[i][i]; }
+  const yhat=X.map(row=>sum(row.map((v,i)=>v*beta[i]))), ym=mean(y);
+  const ssTot=sum(y.map(v=>(v-ym)**2)), ssRes=sum(y.map((v,i)=>(v-yhat[i])**2));
+  return {beta, r2:1-ssRes/ssTot}; }
+const fmt = n => Number.isFinite(n) ? (Math.round(n*1000)/1000).toString() : "—";
+const fmtP = p => p<0.001 ? "p < 0.001" : `p ≈ ${fmt(p)}`;
+
+const F=DATA.map(r=>r.score), E=DATA.map(r=>r.ot), D=DATA.map(r=>r.tenure), H=DATA.map(r=>r.leave);
+
+/* =========================================================
+   3. 実践例（サンプルシートから実際に計算する CALC 辞書）
+========================================================= */
+const CALC = {
+A1:()=>({formula:"df['score'].mean()", html:`評価点の平均は <b>${fmt(mean(F))}点</b>。`}),
+A2:()=>({formula:"df['score'].median()", html:`中央値は <b>${fmt(median(F))}点</b>（平均${fmt(mean(F))}と近く歪みは小さい）。`}),
+A3:()=>{const {modes,max}=modeInfo(D); return {formula:"df['tenure'].mode()", html:`勤続年数は <b>${modes.join('年・')}年</b> が${max}回ずつで複峰性。`}},
+A4:()=>({formula:"df['score'].var(ddof=1)", html:`標本分散は <b>${fmt(variance(F,true))}</b>（点²）。`}),
+A5:()=>({formula:"df['score'].std(ddof=1)", html:`標準偏差は <b>${fmt(stdev(F,true))}点</b>。平均${fmt(mean(F))}±${fmt(stdev(F,true))}点。`}),
+A6:()=>{const q1=quartile(F,1), q3=quartile(F,3), iqr=q3-q1;
+  return {formula:"df['score'].quantile([0.25,0.75])", html:`Q1=<b>${fmt(q1)}</b>、Q3=<b>${fmt(q3)}</b>、外れ値の目安は${fmt(q1-1.5*iqr)}点未満/${fmt(q3+1.5*iqr)}点超。`}},
+A7:()=>({formula:"df['ot'].std()/df['ot'].mean()", html:`残業時間の変動係数は <b>${fmt(stdev(E,true)/mean(E)*100)}%</b>。`}),
+A8:()=>({formula:"df['score'].skew(); df['score'].kurt()", html:`歪度 <b>${fmt(skewness(F))}</b>、尖度 <b>${fmt(kurtosis(F))}</b>（0に近いほど正規分布に近い）。`}),
+A9:()=>({formula:"df['ot'].corr(df['score'])", html:`残業時間と評価点の相関は <b>${fmt(correl(E,F))}</b>（負の相関）。`}),
+A10:()=>({formula:"df[['ot','score']].cov()", html:`共分散は <b>${fmt(covarP(E,F))}</b>。`}),
+B1:()=>({formula:"norm.cdf(85, df.score.mean(), df.score.std())", html:`評価点85点超の理論上の割合は <b>${fmt((1-normCDF(85,mean(F),stdev(F,true)))*100)}%</b>。`}),
+B2:()=>({formula:"zscore(df['score'])", html:`鈴木さん(評価点${F[1]})のZ値は <b>${fmt(standardize(F[1],mean(F),stdev(F,true)))}</b>。`}),
+B3:()=>{const p=mean(H), n=5, k=3; const comb=(a,b)=>{let r=1; for(let i=0;i<b;i++) r=r*(a-i)/(i+1); return r;};
+  const prob=comb(n,k)*Math.pow(p,k)*Math.pow(1-p,n-k);
+  return {formula:"binom.pmf(3, 5, p=離職率)", html:`離職率${fmt(p*100)}%が続く場合、新規5名中ちょうど3名離職する確率は <b>${fmt(prob*100)}%</b>。`}},
+C2:()=>({formula:"df['score'].std(ddof=1)/np.sqrt(len(df))", html:`標準誤差は <b>${fmt(stdev(F,true)/Math.sqrt(F.length))}</b>。`}),
+C3:()=>{const m=mean(F), s=stdev(F,true), tcrit=2.201, margin=tcrit*s/Math.sqrt(F.length);
+  return {formula:"stats.t.interval(0.95, df=11, loc=mean, scale=se)", html:`評価点平均の95%信頼区間は約 <b>${fmt(m-margin)}〜${fmt(m+margin)}点</b>。`}},
+C7:()=>{const sales=DATA.filter(r=>r.dept==='営業').map(r=>r.score), dev=DATA.filter(r=>r.dept==='開発').map(r=>r.score);
+  const r=welchTTest(sales,dev);
+  return {formula:"ttest_ind(sales, dev, equal_var=False)", html:`営業(${fmt(r.ma)}点)と開発(${fmt(r.mb)}点)の差は t=<b>${fmt(r.t)}</b>(df${fmt(r.df)})、${fmtP(r.p)}。有意差あり。`}},
+C8:()=>{const depts=['営業','開発','人事'];
+  const table=depts.map(d=>{const rows=DATA.filter(r=>r.dept===d); const ln=rows.filter(r=>r.leave===1).length; return [ln, rows.length-ln];});
+  const r=chiSquareTest(table);
+  return {formula:"chi2_contingency(table)", html:`部署×離職の独立性検定は χ²=<b>${fmt(r.chi2)}</b>(df${r.df})、${fmtP(r.p)}。部署差ありと言えそう。`}},
+D1:()=>{const r=linreg(E,F); return {formula:"linregress(x=df.ot, y=df.score)", html:`評価点 ≈ <b>${fmt(r.intercept)}</b> + (${fmt(r.slope)})×残業時間。`}},
+D2:()=>{const r=linreg(E,F); return {formula:"linregress(...).rvalue**2", html:`R² = <b>${fmt(r.r2)}</b>（約${fmt(r.r2*100)}%を説明）。`}},
+D3:()=>{const r=multiRegress([E,D],F);
+  return {formula:"sm.OLS(y, sm.add_constant(X[['ot','tenure']])).fit()", html:`評価点 ≈ <b>${fmt(r.beta[0])}</b> +(${fmt(r.beta[1])})×残業 +(${fmt(r.beta[2])})×勤続年数、R²=<b>${fmt(r.r2)}</b>。`}},
+E9:()=>{let TP=0,FP=0,TN=0,FN=0;
+  DATA.forEach(r=>{const pred=r.ot>45?1:0;
+    if(pred===1&&r.leave===1) TP++; else if(pred===1&&r.leave===0) FP++; else if(pred===0&&r.leave===0) TN++; else FN++;});
+  const prec=TP/(TP+FP), rec=TP/(TP+FN), f1=2*prec*rec/(prec+rec);
+  return {formula:"confusion_matrix(y_true, y_pred); precision_score(); recall_score(); f1_score()",
+  html:`しきい値ルール(残業>45h→離職予測)：TP=${TP} FP=${FP} TN=${TN} FN=${FN}。適合率=<b>${fmt(prec)}</b>、再現率=<b>${fmt(rec)}</b>、F1=<b>${fmt(f1)}</b>。`}},
+};
+
+/* =========================================================
+   4. 用語データ（要点 / 利用例 / Pythonコード）
+========================================================= */
+const CATS = [
+  {key:'A', label:'基礎統計（記述統計）'}, {key:'B', label:'確率分布'},
+  {key:'C', label:'推測統計・仮説検定'}, {key:'D', label:'回帰・多変量解析'},
+  {key:'E', label:'機械学習（教師あり）'}, {key:'F', label:'機械学習（教師なし）'},
+];
+
+let TERMS = [
+{ref:'A1',cat:'A',name:'平均値',kana:'へいきんち / Mean',level:'基礎',
+ points:['データの合計÷個数。全体の中心を表す最も基本的な代表値','外れ値の影響を受けやすい'],
+ usecase:'全体の平均的な水準をざっくり把握したいとき。',
+ python:"df['score'].mean()", related:['A2','A5']},
+{ref:'A2',cat:'A',name:'中央値',kana:'ちゅうおうち / Median',level:'基礎',
+ points:['データを並べたとき真ん中に来る値','外れ値の影響をほぼ受けない'],
+ usecase:'年収や住宅価格など、一部の極端な値に平均が引っ張られていそうなとき。',
+ python:"df['score'].median()", related:['A1','A8']},
+{ref:'A3',cat:'A',name:'最頻値',kana:'さいひんち / Mode',level:'基礎',
+ points:['最も出現頻度が高い値','複数の最頻値（複峰性）を持つこともある'],
+ usecase:'部署・等級などカテゴリデータの「典型」を知りたいとき。',
+ python:"df['tenure'].mode()", related:['A1','A2']},
+{ref:'A4',cat:'A',name:'分散',kana:'ぶんさん / Variance',level:'基礎',
+ points:['平均との差を2乗して平均した値','単位が2乗になり直感的でない'],
+ usecase:'標準偏差や各種検定の計算過程として使う。',
+ python:"df['score'].var(ddof=1)  # 標本分散", related:['A5','A9']},
+{ref:'A5',cat:'A',name:'標準偏差',kana:'ひょうじゅんへんさ / SD',level:'基礎',
+ points:['分散の平方根。元データと同じ単位でばらつきを表せる','実務で最も使われる散布度指標'],
+ usecase:'評価点や売上のばらつきの比較、外れ値の目安（平均±2SD）作りなど。',
+ python:"df['score'].std(ddof=1)", related:['A4','C2']},
+{ref:'A6',cat:'A',name:'四分位数・IQR',kana:'しぶんいすう / Quartile, IQR',level:'基礎',
+ points:['データを4等分する境界値(Q1・Q2・Q3)','Q3-Q1=IQRは外れ値判定の基準になる'],
+ usecase:'外れ値を機械的に定義したいとき（Q1-1.5IQR未満/Q3+1.5IQR超）。',
+ python:"q1, q3 = df['score'].quantile([0.25, 0.75])\niqr = q3 - q1", related:['A2','A5']},
+{ref:'A7',cat:'A',name:'変動係数',kana:'へんどうけいすう / CV',level:'応用',
+ points:['標準偏差÷平均。単位の異なるデータ同士のばらつきを比較できる'],
+ usecase:'「残業時間」と「評価点」のように単位の違う変数の相対的な安定性を比べたいとき。',
+ python:"df['ot'].std() / df['ot'].mean()", related:['A5']},
+{ref:'A8',cat:'A',name:'歪度・尖度',kana:'わいど・せんど / Skewness, Kurtosis',level:'応用',
+ points:['歪度は分布の左右非対称性、尖度は裾の重さ・尖り具合','正規分布は歪度0・尖度(超過)0'],
+ usecase:'検定や回帰の前提「正規性」を簡易チェックしたいとき。',
+ python:"df['score'].skew()\ndf['score'].kurt()", related:['A2','B1']},
+{ref:'A9',cat:'A',name:'相関係数',kana:'そうかんけいすう / Correlation',level:'基礎',
+ points:['2変数の直線的な関係の強さを-1〜1で表す','相関は因果関係を意味しない'],
+ usecase:'「残業時間と評価点は関係がありそうか」など変数間の関係のあたりをつけたいとき。',
+ python:"df['ot'].corr(df['score'])", related:['A10','D1']},
+{ref:'A10',cat:'A',name:'共分散',kana:'きょうぶんさん / Covariance',level:'応用',
+ points:['2変数が同じ方向に動く傾向を表す','単位に依存するため大きさの比較には不向き'],
+ usecase:'相関係数の計算過程や、専門分野（ポートフォリオのリスク計算等）で直接使う。',
+ python:"df[['ot','score']].cov()", related:['A9']},
+
+{ref:'B1',cat:'B',name:'正規分布',kana:'せいきぶんぷ / Normal Distribution',level:'基礎',
+ points:['平均を中心に左右対称の釣り鐘型分布','多くの検定理論の前提になっている'],
+ usecase:'「評価点が◯点を超える確率」のような理論的な割合を見積もりたいとき。',
+ python:"from scipy.stats import norm\nnorm.cdf(85, df.score.mean(), df.score.std())", related:['B2','A8']},
+{ref:'B2',cat:'B',name:'標準化・Z値',kana:'ひょうじゅんか / Standardization',level:'基礎',
+ points:['(値-平均)÷標準偏差で単位を揃えた値','異なる母集団のデータ同士も比較できる'],
+ usecase:'「この社員の評価点は全体のどのあたりか」を一言で示したいとき。',
+ python:"from scipy.stats import zscore\nzscore(df['score'])", related:['B1','A5']},
+{ref:'B3',cat:'B',name:'二項分布',kana:'にこうぶんぷ / Binomial',level:'応用',
+ points:['成功/失敗を繰り返す試行の「成功回数」の分布'],
+ usecase:'離職率が分かっている時、「今後n人中k人が該当する確率」を試算したいとき。',
+ python:"from scipy.stats import binom\nbinom.pmf(3, 5, p)  # 5人中3人の確率", related:['B4']},
+{ref:'B4',cat:'B',name:'ポアソン分布',kana:'ぽあそんぶんぷ / Poisson',level:'応用',
+ points:['一定期間・空間内で稀な事象が発生する回数の分布'],
+ usecase:'問い合わせ件数・欠勤者数・事故件数の予測。',
+ python:"from scipy.stats import poisson\npoisson.pmf(k, mu)", related:['B3']},
+{ref:'B5',cat:'B',name:'一様分布',kana:'いちようぶんぷ / Uniform',level:'基礎',
+ points:['範囲内のすべての値が同じ確率で発生する分布'],
+ usecase:'乱数生成、シミュレーションの土台。',
+ python:"import numpy as np\nnp.random.uniform(low, high, size=1000)", related:['B6']},
+{ref:'B6',cat:'B',name:'中心極限定理',kana:'ちゅうしんきょくげんていり / CLT',level:'応用',
+ points:['母集団の分布の形によらず、標本平均の分布はnが大きいほど正規分布に近づく','t検定など多くの検定手法の理論的根拠'],
+ usecase:'「サンプル数が少なくても検定していいのか」を判断する土台（目安n≧30）。',
+ python:"means = [df.score.sample(5, replace=True).mean() for _ in range(1000)]", related:['B1','C3']},
+
+{ref:'C1',cat:'C',name:'母集団と標本',kana:'ぼしゅうだんとひょうほん / Population & Sample',level:'基礎',
+ points:['母集団は知りたい対象全体、標本はそこから抽出した一部','標本から母集団を推測するのが推測統計の基本発想'],
+ usecase:'分析結果が「このデータだけの話」か「全体にも当てはまる話」かを区別するとき。',
+ python:"# 概念（コード例なし）", related:['C2','C3']},
+{ref:'C2',cat:'C',name:'標準誤差',kana:'ひょうじゅんごさ / Standard Error',level:'応用',
+ points:['標本平均そのもののばらつきを表す指標','nが大きいほど小さくなる（推定が安定する）'],
+ usecase:'信頼区間を作る計算のほぼ必須ステップ。',
+ python:"df['score'].std(ddof=1) / np.sqrt(len(df))", related:['C3','A5']},
+{ref:'C3',cat:'C',name:'信頼区間',kana:'しんらいくかん / Confidence Interval',level:'応用',
+ points:['母数が含まれると期待される範囲','「95%信頼区間」＝同じ調査を100回繰り返せば95回はその区間に真値を含むという意味'],
+ usecase:'点推定だけでなく、その推定の不確実性の幅も併せて示したいとき。',
+ python:"from scipy import stats\nstats.t.interval(0.95, df=len(df)-1, loc=mean, scale=se)",
+ practice:'live', related:['C2','C6']},
+{ref:'C4',cat:'C',name:'帰無仮説・対立仮説',kana:'きむかせつ・たいりつかせつ / Null & Alternative',level:'基礎',
+ points:['帰無仮説(H0)は「差がない」という保守的な仮定、対立仮説(H1)は検証したい主張','検定はH0を否定できるかを間接的に調べる論理構造'],
+ usecase:'検定を組み立てる最初のステップ。何を否定できたら主張が支持されるかを先に言語化する。',
+ python:"# 概念（コード例なし）", related:['C5','C7']},
+{ref:'C5',cat:'C',name:'p値',kana:'ぴーち / p-value',level:'基礎',
+ points:['H0が正しいと仮定したとき、観測結果と同じかそれ以上に極端な結果が得られる確率','小さいほどH0を疑う根拠になる'],
+ usecase:'検定結果の報告に使う基本指標。0.05はあくまで慣習であり絶対の正解ラインではない。',
+ python:"# 各検定関数の戻り値（.pvalue 属性など）", related:['C6','C7']},
+{ref:'C6',cat:'C',name:'有意水準',kana:'ゆういすいじゅん / Significance Level',level:'基礎',
+ points:['帰無仮説を棄却する基準となる確率(通常0.05や0.01)'],
+ usecase:'検定を始める前に基準を決めておく（後からp値を見て基準を変えない）。',
+ python:"alpha = 0.05", related:['C5']},
+{ref:'C7',cat:'C',name:'t検定',kana:'てぃーけんてい / t-test',level:'応用',
+ points:['2グループの平均差を検定する手法','対応なし/対応あり、等分散/不等分散で式が変わる'],
+ usecase:'施策実施群と未実施群の成果比較、研修前後のスコア比較など。',
+ python:"from scipy.stats import ttest_ind\nttest_ind(group1, group2, equal_var=False)",
+ practice:'live', related:['C4','C5','C9']},
+{ref:'C8',cat:'C',name:'カイ二乗検定',kana:'かいにじょうけんてい / Chi-square Test',level:'応用',
+ points:['カテゴリデータの分布や独立性を検定する手法'],
+ usecase:'評価ランクの分布に月ごとの偏りがあるか、属性ごとに離職傾向が違うか等のクロス集計検証。',
+ python:"from scipy.stats import chi2_contingency\nchi2, p, dof, expected = chi2_contingency(table)",
+ practice:'live', related:['C7']},
+{ref:'C9',cat:'C',name:'分散分析（ANOVA）',kana:'ぶんさんぶんせき / ANOVA',level:'応用',
+ points:['3グループ以上の平均を同時に比較する手法','t検定の繰り返しで生じる多重比較の問題を避けられる'],
+ usecase:'3部署以上の評価点を一度に比較したいとき。',
+ python:"from scipy.stats import f_oneway\nf_oneway(group1, group2, group3)", related:['C7']},
+{ref:'C10',cat:'C',name:'検定力・サンプルサイズ設計',kana:'けんていりょく / Statistical Power',level:'応用',
+ points:['検定力(1-β)は本当に差がある時にそれを検出できる確率','サンプルサイズが小さいと第二種の過誤（見逃し）が起きやすい'],
+ usecase:'アンケートや実験の実施前に必要な人数を見積もりたいとき。',
+ python:"from statsmodels.stats.power import TTestIndPower\nTTestIndPower().solve_power(effect_size=.5, alpha=.05, power=.8)", related:['C7']},
+
+{ref:'D1',cat:'D',name:'単回帰分析',kana:'たんかいきぶんせき / Simple Regression',level:'応用',
+ points:['1つの説明変数から目的変数を予測する直線モデル y=ax+b'],
+ usecase:'「残業時間が1時間増えると評価点はどれくらい変わるか」を予測式にしたいとき。',
+ python:"from scipy.stats import linregress\nres = linregress(df['ot'], df['score'])",
+ practice:'live', related:['A9','D2']},
+{ref:'D2',cat:'D',name:'決定係数（R²）',kana:'けっていけいすう / R-squared',level:'応用',
+ points:['回帰モデルが目的変数のばらつきをどれだけ説明できるかを0〜1で表す','説明変数を増やすと見かけ上必ず上がる性質がある'],
+ usecase:'作った予測式がどの程度信頼できるかを一言で示したいとき。',
+ python:"res.rvalue ** 2", practice:'live', related:['D1','D4']},
+{ref:'D3',cat:'D',name:'重回帰分析',kana:'じゅうかいきぶんせき / Multiple Regression',level:'実践',
+ points:['複数の説明変数を同時に使って目的変数を予測するモデル','各係数を比べて要因の強さを評価できる'],
+ usecase:'残業時間・勤続年数など複数要因を同時に考慮して評価点や離職を予測したいとき。',
+ python:"import statsmodels.api as sm\nX = sm.add_constant(df[['ot','tenure']])\nmodel = sm.OLS(df['score'], X).fit()\nprint(model.summary())",
+ practice:'live', related:['D1','D5']},
+{ref:'D4',cat:'D',name:'自由度調整済みR²',kana:'じゆうどちょうせいずみR²',level:'実践',
+ points:['説明変数を増やすと必ず上がるR²の問題を補正した指標'],
+ usecase:'説明変数の数が異なる複数モデルを公平に比較したいとき。',
+ python:"model.rsquared_adj", related:['D2','D3']},
+{ref:'D5',cat:'D',name:'多重共線性（VIF）',kana:'たじゅうきょうせんせい / Multicollinearity',level:'実践',
+ points:['説明変数同士が強く相関している状態','VIFが目安10を超える変数は除外・統合を検討'],
+ usecase:'重回帰の係数の符号や大きさが直感と合わないとき、まず疑うべきポイント。',
+ python:"from statsmodels.stats.outliers_influence import variance_inflation_factor\nvariance_inflation_factor(X.values, i)", related:['D3']},
+{ref:'D6',cat:'D',name:'ロジスティック回帰',kana:'ろじすてぃっくかいき / Logistic Regression',level:'実践',
+ points:['目的変数が0/1のとき使う回帰モデル','結果を確率(0〜1)として出力できる'],
+ usecase:'離職する/しない、購入する/しないなど二値の予測。',
+ python:"from sklearn.linear_model import LogisticRegression\nmodel = LogisticRegression().fit(X, y)", related:['D3','E9']},
+{ref:'D7',cat:'D',name:'主成分分析（PCA）',kana:'しゅせいぶんぶんせき / PCA',level:'実践',
+ points:['相関し合う多数の変数を少数の合成変数に圧縮する手法'],
+ usecase:'評価項目や設問が多すぎるとき、少数の軸に要約して可視化したいとき。',
+ python:"from sklearn.decomposition import PCA\nPCA(n_components=2).fit_transform(X)", related:['F3']},
+
+{ref:'E1',cat:'E',name:'教師あり学習とは',kana:'きょうしありがくしゅう / Supervised Learning',level:'基礎',
+ points:['正解ラベル付きデータから入出力の関係を学習する枠組み','出力が数値なら回帰、カテゴリなら分類'],
+ usecase:'過去データから離職や成果を予測したいなど、正解データが手元にある予測課題全般。',
+ python:"# 概念。実装は下の各手法を参照", related:['E2','D6']},
+{ref:'E2',cat:'E',name:'訓練・検証・テストデータ分割',kana:'ぶんかつ / Train-Test Split',level:'応用',
+ points:['学習用・調整用・最終評価用にデータを分けること','同じデータで学習と評価をすると性能を過大評価する'],
+ usecase:'モデルが本当に未知データに使えるかを正しく評価したいとき。',
+ python:"from sklearn.model_selection import train_test_split\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)", related:['E3','E4']},
+{ref:'E3',cat:'E',name:'過学習・未学習',kana:'かがくしゅう・みがくしゅう / Overfitting, Underfitting',level:'基礎',
+ points:['過学習：訓練データに適合しすぎて未知データへの汎化性能が落ちた状態','未学習：モデルが単純すぎてパターンを捉えられていない状態'],
+ usecase:'訓練データでは精度が高いのに新しいデータで当たらない場合、過学習を疑う。',
+ python:"# train/testの精度差を比較して判断", related:['E2','E4']},
+{ref:'E4',cat:'E',name:'交差検証',kana:'こうさけんしょう / Cross Validation',level:'応用',
+ points:['データをk個に分割し、順番に検証用として使い回す手法'],
+ usecase:'手元のデータ数が少なく、1回の分割だけでは評価がブレそうなとき。',
+ python:"from sklearn.model_selection import cross_val_score\ncross_val_score(model, X, y, cv=5)", related:['E2']},
+{ref:'E5',cat:'E',name:'決定木',kana:'けっていぎ / Decision Tree',level:'応用',
+ points:['条件分岐を繰り返して分類・予測する木構造モデル','解釈しやすいが単体では過学習しやすい'],
+ usecase:'予測の理由を人事や経営層に説明する必要がある場面。',
+ python:"from sklearn.tree import DecisionTreeClassifier\nmodel = DecisionTreeClassifier(max_depth=3).fit(X, y)",
+ practice:'live', related:['E6','E9']},
+{ref:'E6',cat:'E',name:'ランダムフォレスト',kana:'らんだむふぉれすと / Random Forest',level:'実践',
+ points:['複数の決定木の多数決・平均を取るアンサンブル手法','単一の決定木より精度・安定性が高い'],
+ usecase:'ある程度の精度を素早く出したい表形式データの予測、特徴量重要度の把握。',
+ python:"from sklearn.ensemble import RandomForestClassifier\nmodel = RandomForestClassifier(n_estimators=200).fit(X, y)", related:['E5','E7']},
+{ref:'E7',cat:'E',name:'勾配ブースティング',kana:'こうばいぶーすてぃんぐ / Gradient Boosting',level:'実践',
+ points:['弱い予測モデルを誤差修正しながら順に追加していく手法','表形式データで高精度を出しやすい'],
+ usecase:'精度を追求したい表形式データの予測（XGBoost, LightGBM等）。',
+ python:"from xgboost import XGBClassifier\nmodel = XGBClassifier().fit(X, y)", related:['E6']},
+{ref:'E8',cat:'E',name:'SVM（サポートベクターマシン）',kana:'えすぶいえむ / SVM',level:'実践',
+ points:['クラス間のマージンを最大化する境界を引く分類手法'],
+ usecase:'特徴量の数がデータ数に対して多い場合の分類問題。',
+ python:"from sklearn.svm import SVC\nmodel = SVC(kernel='rbf').fit(X, y)", related:['E5']},
+{ref:'E9',cat:'E',name:'混同行列・適合率・再現率・F1',kana:'こんどうぎょうれつ / Precision, Recall, F1',level:'応用',
+ points:['分類モデルの正解・誤りを整理した表','適合率=当たった割合、再現率=正例を捉えた割合、F1はその調和平均'],
+ usecase:'見逃し(FN)と誤検知(FP)のどちらを重視すべきか議論するとき。',
+ python:"from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score",
+ practice:'live', related:['E10','D6']},
+{ref:'E10',cat:'E',name:'ROC曲線・AUC',kana:'あーるおーしー / ROC Curve, AUC',level:'実践',
+ points:['閾値を変化させたときの真陽性率・偽陽性率の関係を描いた曲線','AUCは1に近いほど分類性能が高い'],
+ usecase:'閾値を決め打ちせずモデルそのものの分類能力を評価・比較したいとき。',
+ python:"from sklearn.metrics import roc_auc_score\nroc_auc_score(y_true, y_score)", related:['E9']},
+
+{ref:'F1',cat:'F',name:'クラスタリング（k-means）',kana:'くらすたりんぐ / k-means',level:'応用',
+ points:['正解ラベルなしデータをk個のグループに分ける教師なし学習'],
+ usecase:'似た働き方・属性の社員のセグメント分け、顧客の購買傾向グループ化。',
+ python:"from sklearn.cluster import KMeans\nKMeans(n_clusters=3, random_state=0).fit(X)", related:['F2']},
+{ref:'F2',cat:'F',name:'階層的クラスタリング',kana:'かいそうてきくらすたりんぐ',level:'実践',
+ points:['距離をもとに樹形図(デンドログラム)を作る手法','事前にグループ数を決める必要がない'],
+ usecase:'いくつのグループに分けるべきか自体を後から柔軟に決めたいとき。',
+ python:"from scipy.cluster.hierarchy import linkage, dendrogram\nZ = linkage(X, method='ward')", related:['F1']},
+{ref:'F3',cat:'F',name:'次元削減とPCA',kana:'じげんさくげん / Dimensionality Reduction',level:'実践',
+ points:['変数が多すぎるデータを情報を保ちながら少ない次元に圧縮すること'],
+ usecase:'設問数の多いアンケートを少数の軸に要約して可視化したいとき。',
+ python:"from sklearn.decomposition import PCA\nPCA(n_components=2).fit_transform(X)", related:['D7']},
+{ref:'F4',cat:'F',name:'異常検知',kana:'いじょうけんち / Anomaly Detection',level:'実践',
+ points:['大多数と異なる振る舞いをするデータ点を検出する手法群'],
+ usecase:'不正利用の検知、急な残業増加など異常な勤怠パターンの早期発見。',
+ python:"from sklearn.ensemble import IsolationForest\nIsolationForest().fit_predict(X)", related:['A6']},
+];
+const rawTerms = JSON.parse(JSON.stringify(TERMS)); // フォールバック用の控え
+
+/* =========================================================
+   5. GAS 連携（読み込み・追加）
+========================================================= */
+function parseSheetRows(rows){
+  return rows.map(r=>({
+    ref:r.ref, cat:r.cat, name:r.name, kana:r.kana, level:r.level,
+    points:(r.points||'').split('\n').map(s=>s.trim()).filter(Boolean),
+    usecase:r.usecase, python:r.python,
+    related:(r.related||'').split(',').map(s=>s.trim()).filter(Boolean),
+  }));
+}
+async function loadFromGAS(url){
+  const pill = document.getElementById('syncPill');
+  try{
+    const res = await fetch(url, {method:'GET'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const rows = await res.json();
+    if(Array.isArray(rows) && rows.length){
+      TERMS = parseSheetRows(rows);
+      pill.textContent = 'スプレッドシート接続中 ('+TERMS.length+'件)';
+      pill.className = 'sync-pill ok';
+    } else {
+      throw new Error('シートが空です');
+    }
+  }catch(err){
+    TERMS = JSON.parse(JSON.stringify(rawTerms));
+    pill.textContent = 'スプレッドシート未接続（サンプル表示）';
+    pill.className = 'sync-pill local';
+    document.getElementById('addStatus').textContent = '接続失敗: '+err.message+'（サンプルデータで表示しています）';
+  }
+  currentRef = null; renderList(); renderDetail();
+}
+document.getElementById('connectBtn').addEventListener('click',()=>{
+  const url = document.getElementById('gasUrl').value.trim();
+  if(!url){ document.getElementById('addStatus').textContent = 'URLを入力してください。'; return; }
+  CONFIG.GAS_URL = url;
+  document.getElementById('addStatus').textContent = '読み込み中…';
+  loadFromGAS(url);
+});
+document.getElementById('addBtn').addEventListener('click', async ()=>{
+  const url = CONFIG.GAS_URL || document.getElementById('gasUrl').value.trim();
+  const status = document.getElementById('addStatus2');
+  if(!url){ status.textContent = '先にGAS URLを接続してください。'; return; }
+  const payload = {
+    ref: document.getElementById('f_ref').value.trim(),
+    cat: document.getElementById('f_cat').value,
+    name: document.getElementById('f_name').value.trim(),
+    kana: document.getElementById('f_kana').value.trim(),
+    level: document.getElementById('f_level').value,
+    points: document.getElementById('f_points').value.trim(),
+    usecase: document.getElementById('f_usecase').value.trim(),
+    python: document.getElementById('f_python').value.trim(),
+    related: document.getElementById('f_related').value.trim(),
+  };
+  if(!payload.ref || !payload.name){ status.textContent = '参照IDと用語名は必須です。'; return; }
+  status.textContent = '送信中…';
+  try{
+    const res = await fetch(url, {method:'POST', body: JSON.stringify(payload)});
+    const j = await res.json();
+    status.textContent = j.status==='ok' ? '追加しました。再読み込みします…' : ('エラー: '+JSON.stringify(j));
+    if(j.status==='ok') loadFromGAS(url);
+  }catch(err){ status.textContent = '送信エラー: '+err.message; }
+});
+
+/* =========================================================
+   6. 描画処理
+========================================================= */
+let byRef = Object.fromEntries(TERMS.map(t=>[t.ref,t]));
+let currentCat = null;
+let currentRef = null;
+
+function renderTabs(){
+  const el = document.getElementById('tabs');
+  el.innerHTML = CATS.map(c=>`<div class="tab ${c.key===currentCat?'active':''}" data-cat="${c.key}">
+      <span class="tab-letter">${c.key}</span><span>${c.label}</span></div>`).join('') +
+      `<div class="sheet-note">全件表示にはタブ選択を解除。<button id="showAllBtn">すべて表示</button></div>`;
+  el.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+    currentCat = t.dataset.cat===currentCat ? null : t.dataset.cat; renderTabs(); renderList(); }));
+  document.getElementById('showAllBtn').addEventListener('click',()=>{currentCat=null; renderTabs(); renderList();});
+}
+function renderList(){
+  byRef = Object.fromEntries(TERMS.map(t=>[t.ref,t]));
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  let items = TERMS.filter(t=>{
+    if(currentCat && t.cat!==currentCat) return false;
+    if(!q) return true;
+    return (t.name+t.kana+(t.points||[]).join('')+t.usecase).toLowerCase().includes(q);
+  });
+  document.getElementById('countPill').textContent = items.length+'件';
+  const el = document.getElementById('listPane');
+  el.innerHTML = items.map(t=>`<div class="row-item ${t.ref===currentRef?'active':''}" data-ref="${t.ref}">
+      <span class="ref-badge">${t.ref}</span><div><span class="name">${t.name}</span><span class="kana">${t.kana}</span></div></div>`
+    ).join('') || `<div class="empty-state" style="padding-top:20px;">該当する用語がありません。</div>`;
+  el.querySelectorAll('.row-item').forEach(r=>r.addEventListener('click',()=>{ currentRef=r.dataset.ref; renderList(); renderDetail(); }));
+}
+function renderDetail(){
+  const t = byRef[currentRef];
+  const el = document.getElementById('detailPane');
+  if(!t){ el.innerHTML = `<div class="empty-state">左のリストから用語を選ぶか、検索してください。</div>`; return; }
+  let practiceHtml = '';
+  if(CALC[t.ref]){
+    const r = CALC[t.ref]();
+    practiceHtml = `<div class="section-label">実践例（サンプルシートで計算）</div>
+      <div class="practice-box"><div class="p-formula"># ${r.formula}</div><div class="p-result">${r.html}</div></div>`;
+  }
+  el.innerHTML = `
+    <div class="entry-head">
+      <span class="ref-badge-lg">${t.ref}</span>
+      <div><div class="entry-title">${t.name}<span class="level-tag">${t.level}</span></div>
+      <div class="entry-kana">${t.kana}</div></div>
+    </div>
+    <div class="section-label">要点</div>
+    <ul class="points">${(t.points||[]).map(p=>`<li>${p}</li>`).join('')}</ul>
+    <div class="section-label">利用例</div>
+    <div class="usecase-text">${t.usecase||''}</div>
+    <div class="section-label">Pythonコード</div>
+    <div class="py-box"><pre>${(t.python||'').replace(/</g,'&lt;')}</pre></div>
+    ${practiceHtml}
+    ${t.related && t.related.length ? `<div class="section-label">関連用語</div>
+    <div class="related-tags">${t.related.map(r=>`<span class="rel-tag" data-ref="${r}">${r} ${byRef[r]?byRef[r].name:''}</span>`).join('')}</div>` : ''}
+  `;
+  el.querySelectorAll('.rel-tag').forEach(tag=>tag.addEventListener('click',()=>{
+    currentRef = tag.dataset.ref; currentCat = byRef[currentRef] ? byRef[currentRef].cat : currentCat;
+    renderTabs(); renderList(); renderDetail(); document.getElementById('detailPane').scrollTop = 0; }));
+}
+function renderSheet(){
+  const rows = DATA.map(r=>`<tr><td class="rownum">${r.id+1}</td><td>${r.id}</td><td>${r.name}</td><td>${r.age}</td>
+      <td>${r.tenure}</td><td>${r.ot}</td><td>${r.score}</td><td>${r.dept}</td><td>${r.leave}</td></tr>`).join('');
+  document.getElementById('sheetTable').innerHTML = `<table class="gridsheet">
+    <thead><tr><th class="rownum">#</th><th>A<br>ID</th><th>B<br>名前</th><th>C<br>年齢</th><th>D<br>勤続年数</th>
+    <th>E<br>残業(h/月)</th><th>F<br>評価点</th><th>G<br>部署</th><th>H<br>離職</th></tr></thead>
+    <tbody><tr><td class="rownum">1</td><td colspan="8" style="text-align:left;color:#8a8a7a;">（ヘッダー行）</td></tr>${rows}</tbody></table>`;
+}
+
+document.getElementById('search').addEventListener('input', renderList);
+renderTabs(); renderList(); renderSheet();
+if(CONFIG.GAS_URL){ document.getElementById('gasUrl').value = CONFIG.GAS_URL; loadFromGAS(CONFIG.GAS_URL); }
+</script>
+</body>
+</html>
